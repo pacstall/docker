@@ -1,0 +1,402 @@
+#!/usr/bin/env bash
+dateiniso="$(date +%Y%m%d)"
+shopt -s extglob
+
+if [[ ${PWD} == @(/usr/bin|/usr/local/bin) ]]; then
+  dock_dir="/tmp"
+else
+  dock_dir="${PWD}"
+fi
+
+# Colors
+if [[ -z $NO_COLOR ]]; then
+  export RED=$'\033[0;31m'
+  export GREEN=$'\033[0;32m'
+  export YELLOW=$'\033[0;33m'
+  export BLUE=$'\033[0;34m'
+  export PURPLE=$'\033[0;35m'
+  export CYAN=$'\033[0;36m'
+  export WHITE=$'\033[0;37m'
+  export BGreen=$'\033[1;32m'
+  export BCyan=$'\033[1;36m'
+  export BYellow=$'\033[1;33m'
+  export BPurple=$'\033[1;35m'
+  export BRed=$'\033[1;31m'
+  export BWhite=$'\033[1;37m'
+  export NC=$'\033[0m'
+fi
+
+function show_help() {
+  cat << EOF
+${BYellow}Usage:${NC} ${0##*/} ${PURPLE}[OPTIONS]${NC}
+
+${BYellow}Options:${NC}
+
+${BGreen}-V/-v, --version${NC}  Image version tag
+                  (default: ${CYAN}current date in YYYYMMDD format${NC})
+
+${BGreen}-A/-a, --arch${NC}     Target architecture
+                  (options: ${CYAN}auto${NC}, ${CYAN}arm64${NC}/${CYAN}aarch64${NC}, ${CYAN}amd64${NC}/${CYAN}x86_64${NC}, default: ${CYAN}all${NC}/${CYAN}off${NC})
+
+${BGreen}-C/-c, --clean${NC}    Use --no-cache during Docker image build
+                  (default: ${CYAN}disabled${NC})
+
+${BGreen}-F/-f, --file${NC}     Create only the Dockerfile, with instructions
+                  (default: ${CYAN}prompted${NC})
+
+${BGreen}-B/-b, --build${NC}    Create both the Dockerfile and the Docker image
+                  (default: ${CYAN}prompted${NC})
+
+${BGreen}-P/-p, --pull${NC}     Pull a Docker image from the upstream registry
+                  (options: ${CYAN}--version${NC}, default: ${CYAN}always uses --arch auto${NC})
+
+${BGreen}-T/-t, --test${NC}     Start the Docker image up after build or pull is complete
+                  (default: ${CYAN}disabled or prompted${NC})
+
+${BGreen}-W/-w, --wipe${NC}     ${YELLOW}Hazardous:${NC} Delete all related Dockerfiles and Docker images
+                  (default: ${CYAN}always prompted${NC})
+
+${BGreen}-H/-h, --help${NC}     Show this help message
+
+${BYellow}Description:${NC}
+
+ This script helps to easily build and test Pacstall Docker images, or pull
+ them upstream. Designed to be adaptable with other Ubuntu-based Docker builds.
+
+${BYellow}Examples:${NC}
+
+ ${BPurple}${0##*/} -f${NC}
+
+  Creates the file ${BGreen}Dockerfile-Pacstall-${dateiniso}${NC} for building the image
+  ${BGreen}pacstall/pacstall:${dateiniso}${NC}, with instructions on how to build and run it.
+
+  ${BYellow}Note:${NC} if no options are passed, this is the default function, but users
+  will be asked if they would like to build and test the image.
+
+
+ ${BPurple}${0##*/} -b -t -c -v 4.3.2 -a x86_64${NC}
+
+  Builds and starts ${BGreen}amd64/pacstall/pacstall:4.3.2${NC} from scratch.
+
+  ${BYellow}Note:${NC} the version tag may not correlate with the actual Pacstall version.
+  This option is meant for easily publishing images for specific milestones.
+
+
+ ${BPurple}${0##*/} -p -t -v latest${NC}
+
+  Pulls and starts ${BGreen}ghcr.io/pacstall/pacstall:latest${NC}.
+
+
+${BPurple}${0##*/}${NC} ${BCyan}0.1.2${NC}
+${BYellow}Written by:${NC} Oren Klopfer <oren@taumoda.com>
+
+EOF
+}
+
+function ask() {
+  local prompt default reply
+
+  if [[ ${2-} == 'Y' ]]; then
+    prompt="${BGreen}Y${NC}/${BRed}n${NC}"
+    default='Y'
+  elif [[ ${2-} == 'N' ]]; then
+    prompt="${BGreen}y${NC}/${BRed}N${NC}"
+    default='N'
+  else
+    prompt="${BGreen}y${NC}/${BRed}n${NC}"
+  fi
+
+  # Ask the question (not using "read -p" as it uses stderr not stdout)
+  echo -ne "$1 [$prompt] "
+
+  if [[ ${DISABLE_PROMPTS:-z} == "z" ]]; then
+    export DISABLE_PROMPTS="no"
+  fi
+
+  if [[ $DISABLE_PROMPTS == "no" ]]; then
+    read -r reply <&0
+    # Detect if script is running non-interactively
+    # Which implies that the input is being piped into the script
+    if [[ $NON_INTERACTIVE ]]; then
+      if [[ -z $reply ]]; then
+        echo -n "$default"
+      fi
+      echo "$reply"
+    fi
+  else
+    echo "$default"
+    reply=$default
+  fi
+
+  # Default?
+  if [[ -z $reply ]]; then
+    reply=$default
+  fi
+
+  while :; do
+    # Check if the reply is valid
+    case "$reply" in
+      Y* | y*)
+        export answer=1
+        return 0 #return code for backwards compatibility
+        break
+        ;;
+      N* | n*)
+        export answer=0
+        return 1 #return code
+        break
+        ;;
+      *)
+        echo -ne "$1 [$prompt] "
+        read -r reply < /dev/tty
+        ;;
+    esac
+  done
+}
+
+function wipe_docker_bits() {
+  local_docker_images=($(docker image ls | grep pacstall | awk '{print $1":"$2}'))
+  ldi_hashes=($(docker image ls | grep pacstall | awk '{print $3}'))
+  local_docker_files=()
+  for i in ${dock_dir}/*; do
+    if grep -q 'Dockerfile.Pacstall' <<< "${i}"; then
+      local_docker_files+=("${i}")
+    fi
+  done
+  echo "${BYellow}Found${NC} ${BPurple}${#local_docker_files[@]}${NC} ${BYellow}files:${NC}"
+  if ! [[ -z ${local_docker_files} ]]; then
+    for i in ${local_docker_files[*]}; do
+      echo ${CYAN}${i}${NC}
+    done
+    ask "Remove files?" N
+    if ((answer == 1)); then
+      for i in ${local_docker_files[*]}; do
+        echo "${BRed}Removing:${NC} ${CYAN}${i}${NC}"
+        rm -f ${i}
+      done
+    fi
+  else
+    echo "${BGreen}No Dockerfiles to remove!${NC}"
+  fi
+  echo "${BYellow}Found${NC} ${BPurple}${#local_docker_images[@]}${NC} ${BYellow}images:${NC}"
+  if ! [[ -z ${local_docker_images} ]]; then
+    for i in ${local_docker_images[*]}; do
+      echo ${CYAN}${i}${NC}
+    done
+    ask "Remove images?" N
+    if ((answer == 1)); then
+      for ((i = 0; i < ${#local_docker_images[@]}; i++)); do
+        echo "${BRed}Removing:${NC} ${CYAN}${local_docker_images[i]}~${ldi_hashes[i]}${NC}"
+        docker rmi ${ldi_hashes[i]} --force
+      done
+    fi
+  else
+    echo "${BGreen}No Docker images to remove!${NC}"
+  fi
+}
+
+test_mode=0
+build_mode=0
+pull_upstream=0
+no_cache=""
+file_trigger=0
+
+while (($# > 0)); do
+  key="$1"
+  case $key in
+    -V | -v | --version)
+      imgver="$2"
+      shift
+      shift
+      ;;
+    -A | -a | --arch)
+      input_darch="$2"
+      shift
+      shift
+      ;;
+    -P | -p | --pull)
+      input_darch="off"
+      pull_upstream=1
+      shift
+      ;;
+    -T | -t | --test)
+      test_mode=1
+      shift
+      ;;
+    -B | -b | --build)
+      if ((file_trigger == 1)); then
+        echo "${BRed}Nope.${NC} ${YELLOW}File is the opposite of Build.${NC}"
+        exit 1
+      fi
+      DISABLE_PROMPTS="yes"
+      build_mode=1
+      shift
+      ;;
+    -C | -c | --clean)
+      no_cache="--no-cache"
+      shift
+      ;;
+    -F | -f | --file)
+      if ((build_mode == 1)); then
+        echo "${BRed}Nope.${NC} ${YELLOW}File is the opposite of Build.${NC}"
+        exit 1
+      fi
+      DISABLE_PROMPTS="yes"
+      file_trigger=1
+      shift
+      ;;
+    -W | -w | --wipe)
+      wipe_docker_bits
+      exit 1
+      ;;
+    -H | -h | --help)
+      show_help
+      exit 0
+      ;;
+  esac
+done
+
+devarch=${HOSTTYPE}
+if ! [[ ${devarch} == @(aarch64|arm64|x86_64|amd64) ]]; then
+  echo "${BYellow}Pacstall Docker only supports ${BPurple}x86_64/amd64${BYellow} + ${BPurple}aarch64/arm64${BYellow} as base architectures!${NC}"
+  exit 1
+fi
+
+if [[ -z ${input_darch} ]]; then
+  input_darch="off"
+elif [[ ${input_darch} == "auto" ]]; then
+  input_darch=${devarch}
+fi
+
+if [[ ${input_darch} == @(aarch64|arm64) ]]; then
+  base_darch="arm64v8/"
+  darcher="-${input_darch}"
+elif [[ ${input_darch} == @(x86_64|amd64) ]]; then
+  base_darch="amd64/"
+  darcher="-${input_darch}"
+elif [[ ${input_darch} == @(off|all) ]]; then
+  base_darch=""
+  darcher=""
+else
+  echo "${BYellow}Pacstall Docker only supports ${BPurple}x86_64/amd64${BYellow} + ${BPurple}aarch64/arm64${BYellow} as base architectures!${NC}"
+  exit 1
+fi
+
+if [[ -z ${imgver} ]]; then
+  imgver="${dateiniso}"
+fi
+
+function cat_built_dock {
+  cat > ${built_dock} << EOF
+FROM ${base_darch}ubuntu:latest
+LABEL org.opencontainers.image.description "Contains Pacstall ${imgver}"
+
+SHELL ["/bin/bash", "-l", "-c"]
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ="Africa/Libreville"
+RUN ln -snf /usr/share/zoneinfo/\$TZ /etc/localtime && echo \$TZ > /etc/timezone
+ARG package="pacstall"
+
+RUN if [[ \$(dpkg --print-architecture) == "amd64" ]]; then \
+        dpkg --add-architecture i386; \
+    fi && \
+    apt-get update && \
+    apt-get dist-upgrade -y && \
+    apt-get install wget curl git sudo nano ca-certificates -y --fix-missing --no-install-recommends && \
+    apt-get clean && \
+    apt-get autoclean && \
+    apt-get autoremove -y
+RUN adduser --disabled-password --gecos '' pacstall && adduser pacstall sudo
+RUN echo N | sudo bash -c "\$(curl -fsSL https://pacstall.dev/q/install\?dnt || wget -q https://pacstall.dev/q/install\?dnt -O -)" && rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+RUN chown -R pacstall:pacstall /var/log/pacstall && chown -R pacstall:pacstall /tmp/pacstall
+# https://askubuntu.com/a/1026978
+RUN rm /etc/apt/apt.conf.d/docker-clean
+
+USER pacstall
+WORKDIR /home/pacstall
+
+# ENTRYPOINT ["/bin/bash"]
+CMD ["bash"]
+EOF
+}
+
+if ((pull_upstream == 1)); then
+  image_registry="ghcr.io/"
+else
+  image_registry="${base_darch}"
+fi
+built_img="${image_registry}pacstall/pacstall:${imgver}"
+
+if ((pull_upstream == 0)); then
+  built_dock="${dock_dir}/Dockerfile-Pacstall-${imgver}${darcher}"
+  if [[ -f ${built_dock} ]]; then
+    rm -f ${built_dock}
+  fi
+  cat_built_dock
+fi
+
+function build_image {
+  docker build -f ${built_dock} -t ${built_img} . ${no_cache} \
+    && echo "${BYellow}Built image${NC} ${BPurple}${built_img}${BYellow}.${NC}"
+}
+
+function start_image {
+  echo "${BYellow}Starting...${NC}" \
+    && docker run -it --net=host ${built_img} bash
+}
+
+function pull_image {
+  echo "${BYellow}Pulling ${BPurple}${built_img}${BYellow}...${NC}" \
+    && docker pull ${built_img}
+}
+
+function not_start_test {
+  echo "${BYellow}Not starting. Run the following command to test:${NC}"
+}
+
+function how_to_start {
+  echo "${GREEN}docker run -it --net=host ${built_img} bash${NC}"
+}
+
+function not_start_build {
+  echo "${BYellow}Not starting. Run the following command to build:${NC}"
+  echo "${GREEN}docker build -f ${built_dock} -t ${built_img} . ${no_cache}${NC}"
+  echo "${BYellow}After the build has complete, run the following command to test the image:${NC}"
+}
+
+function test_image {
+  if ((test_mode == 1)); then
+    start_image
+  else
+    ask "Do you want to start the image to test?" N
+    if ((answer == 0)); then
+      not_start_test
+      how_to_start
+    else
+      start_image
+    fi
+  fi
+}
+
+if ((pull_upstream == 1)); then
+  if pull_image; then
+    test_image
+  else
+    echo "${BYellow}Version ${BPurple}${imgver}${BYellow} does not exist in the registry.${NC}"
+  fi
+elif ((build_mode == 1)); then
+  echo "${BYellow}Dockerfile built at${NC} ${BPurple}${built_dock}${BYellow}. Building${NC} ${BPurple}${built_img}${BYellow}...${NC}"
+  build_image \
+    && test_image
+else
+  echo "${BYellow}Dockerfile built at${NC} ${BPurple}${built_dock}${BYellow}.${NC}"
+  ask "Start image build now?" N
+  if ((answer == 0)); then
+    not_start_build
+    how_to_start
+  else
+    build_image \
+      && test_image
+  fi
+fi

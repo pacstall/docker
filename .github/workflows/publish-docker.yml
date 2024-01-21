@@ -1,8 +1,8 @@
 name: Publish Rhino Docker Images
 
 on:
-  schedule:
-    - cron: "00 00 * * *"
+#  schedule:
+#    - cron: "00 00 * * *"
     
   workflow_dispatch:
     inputs:
