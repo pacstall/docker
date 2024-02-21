@@ -47,7 +47,7 @@ jobs:
           distro_tag="${distro/:/-}"
           ./pacstall-docker-builder -f -a ${arch} -d ${distro} -v ${vertag}
           echo "BUILT_DOCKFILE=Dockerfile-Pacstall-${vertag}-${arch}-${distro_tag}"  >> $GITHUB_ENV
-          echo "DOCK_LABEL=${vertag}.${distro_tag}.${arch}"  >> $GITHUB_ENV
+          echo "DOCK_LABEL=${vertag}"  >> $GITHUB_ENV
           echo "PLATFORM_PAIR=${distro_tag}-${arch}" >> $GITHUB_ENV
           echo "REGISTRY_IMAGE=${{ env.REGISTRY }}/${{ github.repository_owner }}/${distro_tag}" >> $GITHUB_ENV
 
@@ -107,7 +107,7 @@ jobs:
           fi
           distro=${{ matrix.OS }}
           distro_tag="${distro/:/-}"
-          echo "DOCK_LABEL=${vertag}.${distro_tag}" >> $GITHUB_ENV
+          echo "DOCK_LABEL=${vertag}" >> $GITHUB_ENV
           echo "DISTRO_TAG=${distro_tag}" >> $GITHUB_ENV
           echo "REGISTRY_IMAGE=${{ env.REGISTRY }}/${{ github.repository_owner }}/${distro_tag}" >> $GITHUB_ENV
 
@@ -142,12 +142,8 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
-          vertag=${{ env.INPUT_VERTAG }}
-          if [[ -z ${vertag} ]]; then
-            vertag="$(date +%Y%m%d)"
-          fi
           docker buildx imagetools create \
-            --annotation "index:org.opencontainers.image.description=Contains amd64/x86_64 + arm64/aarch64 Pacstall ${vertag} images for ${{ matrix.OS }}." \
+            --annotation "index:org.opencontainers.image.description=Contains amd64/x86_64 + arm64/aarch64 Pacstall ${{ env.DOCK_LABEL }} images for ${{ matrix.OS }}." \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)          
 
