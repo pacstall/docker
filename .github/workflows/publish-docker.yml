@@ -142,8 +142,12 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
+          vertag=${{ env.INPUT_VERTAG }}
+          if [[ -z ${vertag} ]]; then
+            vertag="$(date +%Y%m%d)"
+          fi
           docker buildx imagetools create \
-            --annotation "index:org.opencontainers.image.description=Contains a Pacstall Docker image for development." \
+            --annotation "index:org.opencontainers.image.description=Contains amd64/x86_64 + arm64/aarch64 Pacstall ${vertag} images for ${{ matrix.OS }}." \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)          
 
