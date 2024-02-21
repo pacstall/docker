@@ -349,14 +349,14 @@ else
   image_registry="${base_darch}"
 fi
 
-if [[ -z ${input_distro} || ${base_distro} == "ubuntu:latest" ]]; then
+if [[ -z ${input_distro} ]]; then
   built_img="${image_registry}pacstall/pacstall:${imgver}"
 else
   built_img="${image_registry}pacstall/${base_distro/:/-}:${imgver}"
 fi
 
 if ((pull_upstream == 0)); then
-  if [[ -z ${input_distro} || ${base_distro} == "ubuntu:latest" ]]; then
+  if [[ -z ${input_distro} ]]; then
     built_dock="${dock_dir}/Dockerfile-Pacstall-${imgver}${darcher}"
   else
     built_dock="${dock_dir}/Dockerfile-Pacstall-${imgver}${darcher}-${base_distro/:/-}"
