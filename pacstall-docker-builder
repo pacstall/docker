@@ -36,7 +36,12 @@ ${BGreen}-V/-v, --version${NC}  Image version tag
                   (default: ${CYAN}current date in YYYYMMDD format${NC})
 
 ${BGreen}-A/-a, --arch${NC}     Target architecture
-                  (options: ${CYAN}auto${NC}, ${CYAN}arm64${NC}/${CYAN}aarch64${NC}, ${CYAN}amd64${NC}/${CYAN}x86_64${NC}, default: ${CYAN}all${NC}/${CYAN}off${NC})
+                  (options: ${CYAN}auto${NC}, ${CYAN}all${NC}/${CYAN}off${NC}, ${CYAN}arm64${NC}/${CYAN}aarch64${NC}, ${CYAN}amd64${NC}/${CYAN}x86_64${NC})
+                  (default: ${CYAN}all${NC}/${CYAN}off${NC})
+
+${BGreen}-D/-d, --distro${NC}   Specify a base distro to build image on
+                  (options: ${CYAN}ubuntu:${NC}{${CYAN}release${NC}}, ${CYAN}debian${CYAN}:${NC}{${CYAN}release${NC}})
+                  (default: ${CYAN}ubuntu:latest${NC})
 
 ${BGreen}-C/-c, --clean${NC}    Use --no-cache during Docker image build
                   (default: ${CYAN}disabled${NC})
@@ -50,36 +55,39 @@ ${BGreen}-B/-b, --build${NC}    Create both the Dockerfile and the Docker image
 ${BGreen}-P/-p, --pull${NC}     Pull a Docker image from the upstream registry
                   (options: ${CYAN}--version${NC}, default: ${CYAN}always uses --arch auto${NC})
 
-${BGreen}-T/-t, --test${NC}     Start the Docker image up after build or pull is complete
+${BGreen}-T/-t, --test${NC}     Start up the image after build or pull is complete
                   (default: ${CYAN}disabled or prompted${NC})
 
-${BGreen}-W/-w, --wipe${NC}     ${YELLOW}Hazardous:${NC} Delete all related Dockerfiles and Docker images
+${BGreen}-W/-w, --wipe${NC}     ${YELLOW}Hazardous:${NC} Delete all related Dockerfiles and images
                   (default: ${CYAN}always prompted${NC})
 
 ${BGreen}-H/-h, --help${NC}     Show this help message
 
 ${BYellow}Description:${NC}
 
- This script helps to easily build and test Pacstall Docker images, or pull
- them upstream. Designed to be adaptable with other Ubuntu-based Docker builds.
+ This script helps to easily build and test Pacstall Docker images,
+ or pull them from upstream. Designed to be adaptable with other
+ Ubuntu and Debian-based Docker image builds.
 
 ${BYellow}Examples:${NC}
 
  ${BPurple}${0##*/} -f${NC}
 
   Creates the file ${BGreen}Dockerfile-Pacstall-${dateiniso}${NC} for building the image
-  ${BGreen}pacstall/pacstall:${dateiniso}${NC}, with instructions on how to build and run it.
+  ${BGreen}pacstall/pacstall:${dateiniso}${NC}, with instructions outputted to terminal
+  on how to build and run it.
 
-  ${BYellow}Note:${NC} if no options are passed, this is the default function, but users
-  will be asked if they would like to build and test the image.
+  ${BYellow}Note:${NC} if no options are passed, this is the default function, but
+  users will be prompted if they would like to build and run the image.
 
 
  ${BPurple}${0##*/} -b -t -c -v 4.3.2 -a x86_64${NC}
 
   Builds and starts ${BGreen}amd64/pacstall/pacstall:4.3.2${NC} from scratch.
 
-  ${BYellow}Note:${NC} the version tag may not correlate with the actual Pacstall version.
-  This option is meant for easily publishing images for specific milestones.
+  ${BYellow}Note:${NC} the version tag may not correlate with the actual version
+  of Pacstall when building. This option is meant for easily publishing
+  images for specific milestones.
 
 
  ${BPurple}${0##*/} -p -t -v latest${NC}
@@ -87,7 +95,7 @@ ${BYellow}Examples:${NC}
   Pulls and starts ${BGreen}ghcr.io/pacstall/pacstall:latest${NC}.
 
 
-${BPurple}${0##*/}${NC} ${BCyan}0.1.2${NC}
+${BPurple}${0##*/}${NC} ${BCyan}0.1.3${NC}
 ${BYellow}Written by:${NC} Oren Klopfer <oren@taumoda.com>
 
 EOF
@@ -214,6 +222,11 @@ while (($# > 0)); do
       shift
       shift
       ;;
+    -D | -d | --distro)
+      input_distro="$2"
+      shift
+      shift
+      ;;
     -P | -p | --pull)
       input_darch="off"
       pull_upstream=1
@@ -286,9 +299,18 @@ if [[ -z ${imgver} ]]; then
   imgver="${dateiniso}"
 fi
 
+if [[ -z ${input_distro} ]]; then
+  base_distro="ubuntu:latest"
+elif [[ ${input_distro%%:*} == @(ubuntu|debian) ]]; then
+  base_distro=${input_distro}
+else
+  echo "${BYellow}Pacstall Docker only supports ${BPurple}ubuntu${BYellow} + ${BPurple}debian${BYellow} as base distributions!${NC}"
+  exit 1
+fi
+
 function cat_built_dock {
   cat > ${built_dock} << EOF
-FROM ${base_darch}ubuntu:latest
+FROM ${base_darch}${base_distro}
 LABEL org.opencontainers.image.description "Contains Pacstall ${imgver}"
 
 SHELL ["/bin/bash", "-l", "-c"]
@@ -326,10 +348,19 @@ if ((pull_upstream == 1)); then
 else
   image_registry="${base_darch}"
 fi
-built_img="${image_registry}pacstall/pacstall:${imgver}"
+
+if [[ -z ${input_distro} || ${base_distro} == "ubuntu:latest" ]]; then
+  built_img="${image_registry}pacstall/pacstall:${imgver}"
+else
+  built_img="${image_registry}pacstall/${base_distro/:/-}:${imgver}"
+fi
 
 if ((pull_upstream == 0)); then
-  built_dock="${dock_dir}/Dockerfile-Pacstall-${imgver}${darcher}"
+  if [[ -z ${input_distro} || ${base_distro} == "ubuntu:latest" ]]; then
+    built_dock="${dock_dir}/Dockerfile-Pacstall-${imgver}${darcher}"
+  else
+    built_dock="${dock_dir}/Dockerfile-Pacstall-${imgver}${darcher}-${base_distro/:/-}"
+  fi
   if [[ -f ${built_dock} ]]; then
     rm -f ${built_dock}
   fi

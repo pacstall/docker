@@ -1,10 +1,11 @@
-# Rhino Docker Builder
+# Pacstall Docker Builder
 
-This script helps to easily build and test Rhino Linux Docker images, or pull
-them upstream. Designed to be adaptable with other Ubuntu-based Docker builds.
+This script helps to easily build and test Pacstall Docker images,
+or pull them from upstream. Designed to be adaptable with other
+Ubuntu and Debian-based Docker image builds.
 
 ```
-Usage: rhino-docker-builder [OPTIONS]
+Usage: pacstall-docker-builder [OPTIONS]
 
 Options:
 
@@ -12,7 +13,12 @@ Options:
                   (default: current date in YYYYMMDD format)
 
 -A/-a, --arch     Target architecture
-                  (options: auto, arm64/aarch64, amd64/x86_64, default: all/off)
+                  (options: auto, all/off, arm64/aarch64, amd64/x86_64)
+                  (default: all/off)
+
+-D/-d, --distro   Specify a base distro to build image on
+                  (options: ubuntu:{release}, debian:{release})
+                  (default: ubuntu:latest)
 
 -C/-c, --clean    Use --no-cache during Docker image build
                   (default: disabled)
@@ -26,34 +32,36 @@ Options:
 -P/-p, --pull     Pull a Docker image from the upstream registry
                   (options: --version, default: always uses --arch auto)
 
--T/-t, --test     Start the Docker image up after build or pull is complete
+-T/-t, --test     Start up the image after build or pull is complete
                   (default: disabled or prompted)
 
--W/-w, --wipe     Hazardous: Delete all related Dockerfiles and Docker images
+-W/-w, --wipe     Hazardous: Delete all related Dockerfiles and images
                   (default: always prompted)
 
 -H/-h, --help     Show this help message
 
 Examples:
 
- rhino-docker-builder -f
+ pacstall-docker-builder -f
 
-  Creates the file Dockerfile-RhinoLinux-YYYYMMDD for building the image
-  rhino-linux/docker:YYYYMMDD, with instructions on how to build and run it.
+  Creates the file Dockerfile-Pacstall-YYYYMMDD for building the image
+  pacstall/pacstall:YYYYMMDD, with instructions outputted to terminal
+  on how to build and run it.
 
-  Note: if no options are passed, this is the default function, but users
-  will be asked if they would like to build and test the image.
+  Note: if no options are passed, this is the default function, but
+  users will be prompted if they would like to build and run the image.
 
 
- rhino-docker-builder -b -t -c -v 2023.4 -a x86_64
+ pacstall-docker-builder -b -t -c -v 4.3.2 -a x86_64
     
-  Builds and starts amd64/rhino-linux/docker:2023.4 from scratch.
+  Builds and starts amd64/pacstall/pacstall:4.3.2 from scratch.
 
-  Note: the version tag may not correlate with the actual Rhino Linux version.
-  This option is meant for easily publishing images for specific milestones.
+  Note: the version tag may not correlate with the actual version
+  of Pacstall when building. This option is meant for easily publishing
+  images for specific milestones.
 
 
- rhino-docker-builder -p -t -v latest
+ pacstall-docker-builder -p -t -v latest
     
-  Pulls and starts ghcr.io/rhino-linux/docker:latest.
+  Pulls and starts ghcr.io/pacstall/pacstall:latest.
 ```
