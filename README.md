@@ -9,8 +9,8 @@ Usage: pacstall-docker-builder [OPTIONS]
 
 Options:
 
--V/-v, --version  Image version tag
-                  (default: current date in YYYYMMDD format)
+-V/-v, --version  Pacstall version and Docker image tag
+                  (default: master)
 
 -A/-a, --arch     Target architecture
                   (options: auto, all/off, arm64/aarch64, amd64/x86_64)
@@ -44,7 +44,7 @@ Examples:
 
  pacstall-docker-builder -f
 
-  Creates the file Dockerfile-Pacstall-YYYYMMDD for building the image
+  Creates the file Dockerfile-Pacstall-master-YYYYMMDD for building the image
   pacstall/pacstall:YYYYMMDD, with instructions outputted to terminal
   on how to build and run it.
 
@@ -55,10 +55,6 @@ Examples:
  pacstall-docker-builder -b -t -c -v 4.3.2 -a x86_64
     
   Builds and starts amd64/pacstall/pacstall:4.3.2 from scratch.
-
-  Note: the version tag may not correlate with the actual version
-  of Pacstall when building. This option is meant for easily publishing
-  images for specific milestones.
 
 
  pacstall-docker-builder -p -t -v latest

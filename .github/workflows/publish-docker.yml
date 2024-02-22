@@ -39,14 +39,14 @@ jobs:
         run: |
           vertag=${{ env.INPUT_VERTAG }}
           if [[ -z ${vertag} ]]; then
-            vertag="$(date +%Y%m%d)"
+            vertag="master"
           fi
           platform=${{ matrix.platform }}
           arch=${platform#*/}
           distro=${{ matrix.OS }}
           distro_tag="${distro/:/-}"
           ./pacstall-docker-builder -f -a ${arch} -d ${distro} -v ${vertag}
-          echo "BUILT_DOCKFILE=Dockerfile-Pacstall-${vertag}-${arch}-${distro_tag}"  >> $GITHUB_ENV
+          echo "BUILT_DOCKFILE=Dockerfile-Pacstall-${vertag}-${arch}-${distro_tag}-$(date +%Y%m%d)"  >> $GITHUB_ENV
           echo "DOCK_LABEL=${vertag}"  >> $GITHUB_ENV
           echo "PLATFORM_PAIR=${distro_tag}-${arch}" >> $GITHUB_ENV
           echo "REGISTRY_IMAGE=${{ env.REGISTRY }}/${{ github.repository_owner }}/${distro_tag}" >> $GITHUB_ENV
@@ -103,11 +103,20 @@ jobs:
         run: |
           vertag=${{ env.INPUT_VERTAG }}
           if [[ -z ${vertag} ]]; then
-            vertag="$(date +%Y%m%d)"
+            vertag="master"
           fi
           distro=${{ matrix.OS }}
           distro_tag="${distro/:/-}"
           echo "DOCK_LABEL=${vertag}" >> $GITHUB_ENV
+          if [[ ${vertag} == "develop" ]]; then
+            echo "FLAVOR_LATEST='false'" >> $GITHUB_ENV
+            echo "DATE_DOCK_LABEL=${vertag}-$(date +%Y%m%d)" >> $GITHUB_ENV
+          elif [[ ${vertag} == "master" ]]; then
+            echo "FLAVOR_LATEST='true'" >> $GITHUB_ENV
+            echo "DATE_DOCK_LABEL=${vertag}-$(date +%Y%m%d)" >> $GITHUB_ENV
+          else
+            echo "FLAVOR_LATEST='true'" >> $GITHUB_ENV
+          fi
           echo "DISTRO_TAG=${distro_tag}" >> $GITHUB_ENV
           echo "REGISTRY_IMAGE=${{ env.REGISTRY }}/${{ github.repository_owner }}/${distro_tag}" >> $GITHUB_ENV
 
@@ -130,7 +139,8 @@ jobs:
           images: ${{ env.REGISTRY_IMAGE }}
           tags: |
             type=raw,value=${{ env.DOCK_LABEL }}
-          flavor: latest=true
+            type=raw,value=${{ env.DATE_DOCK_LABEL }}
+          flavor: latest=${{ env.FLAVOR_LATEST }}
 
       - name: Log into registry ${{ env.REGISTRY }}
         uses: docker/login-action@v3
@@ -143,7 +153,7 @@ jobs:
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create \
-            --annotation "index:org.opencontainers.image.description=Contains amd64/x86_64 + arm64/aarch64 Pacstall ${{ env.DOCK_LABEL }} images for ${{ matrix.OS }}." \
+            --annotation "index:org.opencontainers.image.description=Contains amd64/x86_64 + arm64/aarch64 Pacstall ${{ env.DOCK_LABEL }} images for ${{ matrix.OS }}, from $(date +%Y%m%d)." \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)          
 

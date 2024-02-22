@@ -32,8 +32,8 @@ ${BYellow}Usage:${NC} ${0##*/} ${PURPLE}[OPTIONS]${NC}
 
 ${BYellow}Options:${NC}
 
-${BGreen}-V/-v, --version${NC}  Image version tag
-                  (default: ${CYAN}current date in YYYYMMDD format${NC})
+${BGreen}-V/-v, --version${NC}  Pacstall version and Docker image tag
+                  (default: ${CYAN}master${NC})
 
 ${BGreen}-A/-a, --arch${NC}     Target architecture
                   (options: ${CYAN}auto${NC}, ${CYAN}all${NC}/${CYAN}off${NC}, ${CYAN}arm64${NC}/${CYAN}aarch64${NC}, ${CYAN}amd64${NC}/${CYAN}x86_64${NC})
@@ -73,8 +73,8 @@ ${BYellow}Examples:${NC}
 
  ${BPurple}${0##*/} -f${NC}
 
-  Creates the file ${BGreen}Dockerfile-Pacstall-${dateiniso}${NC} for building the image
-  ${BGreen}pacstall/pacstall:${dateiniso}${NC}, with instructions outputted to terminal
+  Creates the file ${BGreen}Dockerfile-Pacstall-master-${dateiniso}${NC} for building the image
+  ${BGreen}pacstall/pacstall:master${NC}, with instructions outputted to terminal
   on how to build and run it.
 
   ${BYellow}Note:${NC} if no options are passed, this is the default function, but
@@ -84,10 +84,6 @@ ${BYellow}Examples:${NC}
  ${BPurple}${0##*/} -b -t -c -v 4.3.2 -a x86_64${NC}
 
   Builds and starts ${BGreen}amd64/pacstall/pacstall:4.3.2${NC} from scratch.
-
-  ${BYellow}Note:${NC} the version tag may not correlate with the actual version
-  of Pacstall when building. This option is meant for easily publishing
-  images for specific milestones.
 
 
  ${BPurple}${0##*/} -p -t -v latest${NC}
@@ -296,7 +292,7 @@ else
 fi
 
 if [[ -z ${imgver} ]]; then
-  imgver="${dateiniso}"
+  imgver="master"
 fi
 
 if [[ -z ${input_distro} ]]; then
@@ -311,7 +307,7 @@ fi
 function cat_built_dock {
   cat > ${built_dock} << EOF
 FROM ${base_darch}${base_distro}
-LABEL org.opencontainers.image.description "Contains Pacstall ${imgver}"
+LABEL org.opencontainers.image.description "Contains pacstall:${imgver} from ${dateiniso}"
 
 SHELL ["/bin/bash", "-l", "-c"]
 ARG DEBIAN_FRONTEND=noninteractive
@@ -332,6 +328,7 @@ RUN adduser --disabled-password --gecos '' pacstall && adduser pacstall sudo
 RUN echo N | sudo bash -c "\$(curl -fsSL https://pacstall.dev/q/install\?dnt || wget -q https://pacstall.dev/q/install\?dnt -O -)" && rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin
 RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 RUN chown -R pacstall:pacstall /var/log/pacstall && chown -R pacstall:pacstall /tmp/pacstall
+RUN runuser -l pacstall -c "HOME=/home/pacstall SUDO_USER=pacstall pacstall -U pacstall:${imgver}"
 # https://askubuntu.com/a/1026978
 RUN rm /etc/apt/apt.conf.d/docker-clean
 
@@ -357,9 +354,9 @@ fi
 
 if ((pull_upstream == 0)); then
   if [[ -z ${input_distro} ]]; then
-    built_dock="${dock_dir}/Dockerfile-Pacstall-${imgver}${darcher}"
+    built_dock="${dock_dir}/Dockerfile-Pacstall-${imgver}${darcher}-${dateiniso}"
   else
-    built_dock="${dock_dir}/Dockerfile-Pacstall-${imgver}${darcher}-${base_distro/:/-}"
+    built_dock="${dock_dir}/Dockerfile-Pacstall-${imgver}${darcher}-${base_distro/:/-}-${dateiniso}"
   fi
   if [[ -f ${built_dock} ]]; then
     rm -f ${built_dock}
