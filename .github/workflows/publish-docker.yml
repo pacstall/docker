@@ -1,14 +1,13 @@
 name: Publish Pacstall Docker Images
 
 on:
-#  schedule:
-#    - cron: "00 00 * * *"
-    
   workflow_dispatch:
     inputs:
       vertag:
         description: 'Version Tag'
         required: false
+  repository_dispatch:
+    types: [trigger-build]
 
 env:
   INPUT_VERTAG: ${{ github.event.inputs.vertag }}
@@ -37,7 +36,13 @@ jobs:
         
       - name: Build Dockerfile
         run: |
-          vertag=${{ env.INPUT_VERTAG }}
+          git_trigger=${{ env.github.event_name }}
+          git_trigger_ver=${{ github.event.client_payload.branch }}
+          if [[ ${git_trigger} == "repository_dispatch" && -n ${git_trigger_ver} ]]; then
+            vertag=${git_trigger_ver}
+          else
+            vertag=${{ env.INPUT_VERTAG }}
+          fi
           if [[ -z ${vertag} ]]; then
             vertag="master"
           fi
@@ -101,7 +106,13 @@ jobs:
     steps:
       - name: Load envars
         run: |
-          vertag=${{ env.INPUT_VERTAG }}
+          git_trigger=${{ env.github.event_name }}
+          git_trigger_ver=${{ github.event.client_payload.branch }}
+          if [[ ${git_trigger} == "repository_dispatch" && -n ${git_trigger_ver} ]]; then
+            vertag=${git_trigger_ver}
+          else
+            vertag=${{ env.INPUT_VERTAG }}
+          fi
           if [[ -z ${vertag} ]]; then
             vertag="master"
           fi
@@ -153,7 +164,7 @@ jobs:
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create \
-            --annotation "index:org.opencontainers.image.description=Contains amd64/x86_64 + arm64/aarch64 Pacstall ${{ env.DOCK_LABEL }} images for ${{ matrix.OS }}, from $(date +%Y%m%d)." \
+            --annotation "index:org.opencontainers.image.description=Contains amd64/x86_64 + arm64/aarch64 pacstall:${{ env.DOCK_LABEL }} images for ${{ matrix.OS }}, from $(date +%Y%m%d)." \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)          
 
