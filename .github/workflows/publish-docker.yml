@@ -36,9 +36,8 @@ jobs:
         
       - name: Build Dockerfile
         run: |
-          git_trigger=${{ env.github.event_name }}
           git_trigger_ver=${{ github.event.client_payload.branch }}
-          if [[ ${git_trigger} == "repository_dispatch" && -n ${git_trigger_ver} ]]; then
+          if [[ -n ${git_trigger_ver} ]]; then
             vertag=${git_trigger_ver}
           else
             vertag=${{ env.INPUT_VERTAG }}
@@ -106,9 +105,8 @@ jobs:
     steps:
       - name: Load envars
         run: |
-          git_trigger=${{ env.github.event_name }}
           git_trigger_ver=${{ github.event.client_payload.branch }}
-          if [[ ${git_trigger} == "repository_dispatch" && -n ${git_trigger_ver} ]]; then
+          if [[ -n ${git_trigger_ver} ]]; then
             vertag=${git_trigger_ver}
           else
             vertag=${{ env.INPUT_VERTAG }}
