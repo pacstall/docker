@@ -6,12 +6,6 @@ on:
       vertag:
         description: 'Version Tag'
         required: false
-  push:
-    branches:
-      - develop
-      - master
-    tags:
-      - '*'
   repository_dispatch:
     types: [trigger-build]
 
