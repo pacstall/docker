@@ -109,13 +109,13 @@ jobs:
           distro_tag="${distro/:/-}"
           echo "DOCK_LABEL=${vertag}" >> $GITHUB_ENV
           if [[ ${vertag} == "develop" ]]; then
-            echo "FLAVOR_LATEST='false'" >> $GITHUB_ENV
+            echo "FLAVOR_LATEST=false" >> $GITHUB_ENV
             echo "DATE_DOCK_LABEL=${vertag}-$(date +%Y%m%d)" >> $GITHUB_ENV
           elif [[ ${vertag} == "master" ]]; then
-            echo "FLAVOR_LATEST='true'" >> $GITHUB_ENV
+            echo "FLAVOR_LATEST=true" >> $GITHUB_ENV
             echo "DATE_DOCK_LABEL=${vertag}-$(date +%Y%m%d)" >> $GITHUB_ENV
           else
-            echo "FLAVOR_LATEST='true'" >> $GITHUB_ENV
+            echo "FLAVOR_LATEST=true" >> $GITHUB_ENV
           fi
           echo "DISTRO_TAG=${distro_tag}" >> $GITHUB_ENV
           echo "REGISTRY_IMAGE=${{ env.REGISTRY }}/${{ github.repository_owner }}/${distro_tag}" >> $GITHUB_ENV
