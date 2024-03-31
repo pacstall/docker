@@ -371,7 +371,7 @@ function build_image {
 
 function start_image {
   echo "${BYellow}Starting...${NC}" \
-    && docker run -it --net=host ${built_img} bash
+    && docker run -it --net=host --privileged ${built_img} bash
 }
 
 function pull_image {
@@ -384,7 +384,7 @@ function not_start_test {
 }
 
 function how_to_start {
-  echo "${GREEN}docker run -it --net=host ${built_img} bash${NC}"
+  echo "${GREEN}docker run -it --net=host --privileged ${built_img} bash${NC}"
 }
 
 function not_start_build {
