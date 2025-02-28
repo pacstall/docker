@@ -81,14 +81,14 @@ ${BYellow}Examples:${NC}
   users will be prompted if they would like to build and run the image.
 
 
- ${BPurple}${0##*/} -b -t -c -v 4.3.2 -a x86_64${NC}
+ ${BPurple}${0##*/} -b -t -c -v 4.3.2 -a x86_64 -d ubuntu:latest${NC}
 
-  Builds and starts ${BGreen}amd64/pacstall/pacstall:4.3.2${NC} from scratch.
+  Builds and starts ${BGreen}amd64/pacstall/ubuntu-latest:4.3.2${NC} from scratch.
 
 
- ${BPurple}${0##*/} -p -t -v latest${NC}
+ ${BPurple}${0##*/} -p -t -v latest -d ubuntu:devel${NC}
 
-  Pulls and starts ${BGreen}ghcr.io/pacstall/pacstall:latest${NC}.
+  Pulls and starts ${BGreen}ghcr.io/pacstall/ubuntu-devel:latest${NC}.
 
 
 ${BPurple}${0##*/}${NC} ${BCyan}0.1.3${NC}
