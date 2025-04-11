@@ -52,9 +52,9 @@ Examples:
   users will be prompted if they would like to build and run the image.
 
 
- pacstall-docker-builder -b -t -c -v 4.3.2 -a x86_64 -d ubuntu:latest
+ pacstall-docker-builder -b -t -c -v 6.2.1 -a x86_64 -d ubuntu:latest
     
-  Builds and starts amd64/pacstall/ubuntu-latest:4.3.2 from scratch.
+  Builds and starts amd64/pacstall/ubuntu-latest:6.2.1 from scratch.
 
 
  pacstall-docker-builder -p -t -v latest -d ubuntu:devel
